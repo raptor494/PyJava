@@ -44,10 +44,10 @@ A nice pro of not caring about whitespace is that you can now make mutli-line la
 ```python
 filter(lambda x {
     if not isinstance(x, str):
-        return False
+        return False;
     if x.isspace():
-        return False
-    return True
+        return False;
+    return True;
 }, args)
 ```
 
@@ -57,9 +57,9 @@ You can also add type annotations to lambdas. Adding type annotations to the par
 ```python
 lambda (x: int, y: int) -> int {
     if x + y < 10 {
-        return 3
+        return 3;
     } else {
-        return x - y
+        return x - y;
     }
 }
 ```
