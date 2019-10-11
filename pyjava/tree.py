@@ -386,6 +386,13 @@ class NormalLambdaParameter(LambdaParameter):
             visitor.visit(self.name)
             visitor.visit(self.default)
 
+class PositionalLambdaParameter(LambdaParameter):
+    def __init__(self):
+        super().__init__(None)
+
+    def __str__(self):
+        return "/"
+
 class StarLambdaParameter(LambdaParameter):
     def __str__(self):
         return f"*{self.name or ''}"
@@ -1230,6 +1237,13 @@ class NormalFunctionParameter(FunctionParameter):
         if self.default:
             result += f" = {self.default}"
         return result
+
+class PositionalFunctionParameter(FunctionParameter):
+    def __init__(self):
+        super().__init__(None)
+
+    def __str__(self):
+        return "/"
 
 class StarFunctionParameter(FunctionParameter):
     def __str__(self):

@@ -1,7 +1,7 @@
 #!/python
 
-from pyparser.parser import PyJavaParser
-from pyparser.tokenize import tokenize
+from pyjava.parser import PyJavaParser
+from pyjava.tokenize import tokenize
 import io
 
 code = RB"""
@@ -60,6 +60,10 @@ dog = class(Animal)() {
         print("woof!");
     }
 };
+
+def foo(x, y, /) {
+    return x + y;
+}
 
 """
 

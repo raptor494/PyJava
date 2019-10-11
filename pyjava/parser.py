@@ -512,33 +512,38 @@ class PyJavaParser:
         if self.accept('**'):
             self.parse_typedargs_starstar_rest(args)
         elif self.accept('*'):
-            self.parse_typedargs_star_rest(args)
+            self.parse_typedargs_star_rest(args, had_positional=False)
         else:
             name = self.parse_name()
             annotation = self.parse_if_accept(functools.partial(self.parse_test, allow_walrus=False), ':')
             self.declvars(name)
             if self.accept('='):
                 args.append(tree.NormalFunctionParameter(name, annotation, self.parse_test(allow_walrus=False)))
-                self.parse_typedargs_default_rest(args)
+                self.parse_typedargs_default_rest(args, had_positional=False)
             else:
                 args.append(tree.NormalFunctionParameter(name, annotation))
+                had_positional = False
                 while self.accept(','):
                     if self.would_accept((':', '{', ')')):
                         break
                     if self.accept('*'):
-                        self.parse_typedargs_star_rest(args)
+                        self.parse_typedargs_star_rest(args, had_positional)
                         break
                     if self.accept('**'):
                         self.parse_typedargs_starstar_rest(args)
                         break
-                    name = self.parse_name()
-                    annotation = self.parse_if_accept(functools.partial(self.parse_test, allow_walrus=False), ':')
-                    self.declvars(name)
-                    if self.accept('='):
-                        args.append(tree.NormalFunctionParameter(name, annotation, self.parse_test(allow_walrus=False)))
-                        self.parse_typedargs_default_rest(args)
-                        break
-                    args.append(tree.NormalFunctionParameter(name, annotation))
+                    if not had_positional and self.accept('/'):
+                        args.append(tree.PositionalFunctionParameter())
+                        had_positional = True
+                    else:
+                        name = self.parse_name()
+                        annotation = self.parse_if_accept(functools.partial(self.parse_test, allow_walrus=False), ':')
+                        self.declvars(name)
+                        if self.accept('='):
+                            args.append(tree.NormalFunctionParameter(name, annotation, self.parse_test(allow_walrus=False)))
+                            self.parse_typedargs_default_rest(args, had_positional)
+                            break
+                        args.append(tree.NormalFunctionParameter(name, annotation))
         return args
 
     def parse_typedargs_starstar_rest(self, args: List[tree.FunctionParameter]):
@@ -547,7 +552,7 @@ class PyJavaParser:
         self.declvars(name)
         self.accept(',')
 
-    def parse_typedargs_star_rest(self, args: List[tree.FunctionParameter]):
+    def parse_typedargs_star_rest(self, args: List[tree.FunctionParameter], had_positional: bool):
         if self.token.exact_type == NAME:
             name = self.parse_name()
             args.append(tree.StarFunctionParameter(name, self.parse_if_accept(self.parse_test, ':')))
@@ -560,28 +565,36 @@ class PyJavaParser:
             if self.accept('**'):
                 self.parse_typedargs_starstar_rest(args)
                 break
-            name = self.parse_name()
-            annotation = self.parse_if_accept(self.parse_test, ':')
-            self.declvars(name)
-            default = self.parse_if_accept(self.parse_test(), '=')
-            args.append(tree.NormalFunctionParameter(name, annotation, default))
+            if not had_positional and self.accept('/'):
+                args.append(tree.PositionalFunctionParameter())
+                had_positional = True
+            else:
+                name = self.parse_name()
+                annotation = self.parse_if_accept(functools.partial(self.parse_test, allow_walrus=False), ':')
+                self.declvars(name)
+                default = self.parse_if_accept(functools.partial(self.parse_test, allow_walrus=False), '=')
+                args.append(tree.NormalFunctionParameter(name, annotation, default))
 
-    def parse_typedargs_default_rest(self, args: List[tree.FunctionParameter]):
+    def parse_typedargs_default_rest(self, args: List[tree.FunctionParameter], had_positional: bool):
         while self.accept(','):
             if self.would_accept((':', '{', ')')):
                 break
             if self.accept('*'):
-                self.parse_typedargs_star_rest(args)
+                self.parse_typedargs_star_rest(args, had_positional)
                 break
             if self.accept('**'):
                 self.parse_typedargs_starstar_rest(args)
                 break
-            name = self.parse_name()
-            annotation = self.parse_if_accept(functools.partial(self.parse_test, allow_walrus=False), ':')
-            self.declvars(name)
-            self.require('=')
-            default = self.parse_test(allow_walrus=False)
-            args.append(tree.NormalFunctionParameter(name, annotation, default))
+            if not had_positional and self.accept('/'):
+                args.append(tree.PositionalFunctionParameter())
+                had_positional = True
+            else:
+                name = self.parse_name()
+                annotation = self.parse_if_accept(functools.partial(self.parse_test, allow_walrus=False), ':')
+                self.declvars(name)
+                self.require('=')
+                default = self.parse_test(allow_walrus=False)
+                args.append(tree.NormalFunctionParameter(name, annotation, default))
 
     #endregion compound_stmt
 
@@ -1024,31 +1037,36 @@ class PyJavaParser:
         if self.accept('**'):
             self.parse_varargs_starstar_rest(args)
         elif self.accept('*'):
-            self.parse_varargs_star_rest(args)
+            self.parse_varargs_star_rest(args, had_positional=False)
         else:
             name = self.parse_name()
             self.declvars(name)
             if self.accept('='):
                 args.append(tree.NormalLambdaParameter(name, self.parse_test(allow_walrus=False)))
-                self.parse_varargs_default_rest(args)
+                self.parse_varargs_default_rest(args, had_positional=False)
             else:
                 args.append(tree.NormalLambdaParameter(name))
+                had_positional = False
                 while self.accept(','):
                     if self.would_accept((':', '{', ')')):
                         break
                     if self.accept('*'):
-                        self.parse_varargs_star_rest(args)
+                        self.parse_varargs_star_rest(args, had_positional)
                         break
                     if self.accept('**'):
                         self.parse_varargs_starstar_rest(args)
                         break
-                    name = self.parse_name()
-                    self.declvars(name)
-                    if self.accept('='):
-                        args.append(tree.NormalLambdaParameter(name, self.parse_test(allow_walrus=False)))
-                        self.parse_varargs_default_rest(args)
-                        break
-                    args.append(tree.NormalLambdaParameter(name))
+                    if not had_positional and self.accept('/'):
+                        args.append(tree.PositionalLambdaParameter())
+                        had_positional = True
+                    else:
+                        name = self.parse_name()
+                        self.declvars(name)
+                        if self.accept('='):
+                            args.append(tree.NormalLambdaParameter(name, self.parse_test(allow_walrus=False)))
+                            self.parse_varargs_default_rest(args, had_positional)
+                            break
+                        args.append(tree.NormalLambdaParameter(name))
         return args
 
     def parse_varargs_starstar_rest(self, args: List[tree.LambdaParameter]):
@@ -1057,7 +1075,7 @@ class PyJavaParser:
         self.declvars(name)
         self.accept(',')
 
-    def parse_varargs_star_rest(self, args: List[tree.LambdaParameter]):
+    def parse_varargs_star_rest(self, args: List[tree.LambdaParameter], had_positional: bool):
         if self.token.exact_type == NAME:
             name = self.parse_name()
             args.append(tree.StarLambdaParameter(name))
@@ -1070,26 +1088,34 @@ class PyJavaParser:
             if self.accept('**'):
                 self.parse_varargs_starstar_rest(args)
                 break
-            name = self.parse_name()
-            self.declvars(name)
-            default = self.parse_if_accept(self.parse_test(), '=')
-            args.append(tree.NormalLambdaParameter(name, default))
+            if not had_positional and self.accept('/'):
+                args.append(tree.PositionalLambdaParameter())
+                had_positional = True
+            else:
+                name = self.parse_name()
+                self.declvars(name)
+                default = self.parse_if_accept(functools.partial(self.parse_test, allow_walrus=False), '=')
+                args.append(tree.NormalLambdaParameter(name, default))
 
-    def parse_varargs_default_rest(self, args: List[tree.LambdaParameter]):
+    def parse_varargs_default_rest(self, args: List[tree.LambdaParameter], had_positional: bool):
         while self.accept(','):
             if self.would_accept((':', '{', ')')):
                 break
             if self.accept('*'):
-                self.parse_varargs_star_rest(args)
+                self.parse_varargs_star_rest(args, had_positional)
                 break
             if self.accept('**'):
                 self.parse_varargs_starstar_rest(args)
                 break
-            name = self.parse_name()
-            self.declvars(name)
-            self.require('=')
-            default = self.parse_test(allow_walrus=False)
-            args.append(tree.NormalLambdaParameter(name, default))
+            if not had_positional and self.accept('/'):
+                args.append(tree.PositionalLambdaParameter())
+                had_positional = True
+            else:
+                name = self.parse_name()
+                self.declvars(name)
+                self.require('=')
+                default = self.parse_test(allow_walrus=False)
+                args.append(tree.NormalLambdaParameter(name, default))
 
     def declvars(self, arg):
         if isinstance(arg, (str, tree.Name)):
