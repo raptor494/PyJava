@@ -88,4 +88,5 @@ dog = class(Animal)() {
 
 ### Notes
 1. The walrus operator `:=`, new in Python 3.8, is supported.
-2. I shouldn't have to mention this, but this project only supports Python 3.
+2. The positional parameter syntax `/`, new in Python 3.8, is supported.
+3. I shouldn't have to mention this, but this project only supports Python 3.
