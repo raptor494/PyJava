@@ -262,7 +262,11 @@ class PyJavaParser:
             self.require(';')
             return tree.MultiAssignmentStatement(assigned, value)
         else:
-            self.require(';')
+            if isinstance(expr, tree.StringLiteral):
+                self.accept(';')
+            else:
+                self.require(';')
+
             return tree.ExpressionStatement(expr)
 
     def parse_del_stmt(self):
@@ -504,7 +508,7 @@ class PyJavaParser:
         else:
             args = []
         with self.scope:
-            body = self.parse_body(is_class=True)
+            body = self.parse_body()
         return tree.ClassStatement(name, args, body)
 
     def parse_typedargslist(self):
@@ -598,7 +602,7 @@ class PyJavaParser:
 
     #endregion compound_stmt
 
-    def parse_body(self, is_class=False):
+    def parse_body(self):
         if self.accept('{'):
             stmts = []
             if self.accept('}'):
