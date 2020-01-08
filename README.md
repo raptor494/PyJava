@@ -8,7 +8,7 @@ called the same thing except with a `.py` extension.
 The program tries to format the file to be human-readable but may not be quite right in places. Use your own formatter as necessary.
 The parser does not *always* check for semantically invalid syntax, such as duplicate/missing variable names, duplicate functions, etc.
 
-### Differences from Normal Java
+### Differences from Normal Python
 #### Simple Statements
 Non-compound statements must now end with a semicolon.
 
@@ -68,7 +68,7 @@ lambda (x: int, y: int) -> int {
 You can now do anonymous classes.
 The syntax is this:
 
-    class <name> [superclass arguments] <arguments> <brace-enclosed class body>
+    class [superclass arguments] <arguments> <brace-enclosed class body>
 
 If superclass arguments are provided, the hidden name of the class will try to be similar to the first superclass defined. Otherwise, it will be similar to 'object'.
 
