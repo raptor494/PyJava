@@ -5,12 +5,13 @@ This project is the inverse of my [JavaPy project](https://github.com/raptor4694
 ### Usage
 Call the program with `python pyjava.py <filename>` and it will output a file
 called the same thing except with a `.py` extension.
+Add the `--optional-semicolons` flag to make semicolons optional.
 The program tries to format the file to be human-readable but may not be quite right in places. Use your own formatter as necessary.
 The parser does not *always* check for semantically invalid syntax, such as duplicate/missing variable names, duplicate functions, etc.
 
 ### Differences from Normal Python
 #### Simple Statements
-Non-compound statements must now end with a semicolon.
+Non-compound statements must now end with a semicolon *unless* the `--optional-semicolons` flag is provided.
 
 #### Code Blocks (aka Suites)
 A block of code is now enclosed in curly brackets `{` `}`.

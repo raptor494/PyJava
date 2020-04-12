@@ -8,7 +8,7 @@ from pyjava.util import *
 __all__ = ["PyJavaParser", "parse_file", "parse_str"]
 
 class PyJavaParser:
-    def __init__(self, tokens: Iterable[TokenInfo], filename="<unknown source>"):
+    def __init__(self, tokens: Iterable[TokenInfo], filename="<unknown source>", optional_semicolons=False):
         tokens = list(tokens)
         #region merge tokens
         i = 0
@@ -33,6 +33,7 @@ class PyJavaParser:
         self.tokens = LookAheadListIterator(tokens)
         self.filename = filename
         self.scope = ParserScope(self)
+        self.optional_semicolons = optional_semicolons
         if self.token.type == ENCODING:
             next(self.tokens)
         while self.token.type == COMMENT:
@@ -127,6 +128,12 @@ class PyJavaParser:
         if not result:
             raise SyntaxError(f'expected {" ".join(self._test_str(x) for x in tests)}', self.position)
         return result
+
+    def require_semicolon(self):
+        if self.optional_semicolons:
+            self.accept(';')
+        else:
+            self.require(';')
     
     @property
     def position(self):
@@ -242,7 +249,7 @@ class PyJavaParser:
                 value = self.parse_test(allow_walrus=False)
             else:
                 value = None
-            self.require(';')
+            self.require_semicolon()
             return tree.AnnotatedAssignmentStatement(expr, annotation, value)
         elif self.accept('='):
             self.declvars(expr)
@@ -259,63 +266,66 @@ class PyJavaParser:
                         break
                     else:
                         value = self.parse_testlist_star_expr()
-            self.require(';')
+            self.require_semicolon()
             return tree.MultiAssignmentStatement(assigned, value)
         else:
             if isinstance(expr, tree.StringLiteral):
                 self.accept(';')
             else:
-                self.require(';')
+                self.require_semicolon()
 
             return tree.ExpressionStatement(expr)
 
     def parse_del_stmt(self):
         self.require('del')
         exprs = self.parse_exprlist()
-        self.require(';')
+        self.require_semicolon()
         exprs = exprs.items if isinstance(exprs, tree.CommaExpression) else [exprs]
         for expr in exprs:
             self.delvars(expr)
         return tree.DelStatement(exprs)
 
     def parse_pass_stmt(self):
-        self.require('pass', ';')
+        self.require('pass')
+        self.require_semicolon()
         return tree.PassStatement()
 
     def parse_break_stmt(self):
-        self.require('break', ';')
+        self.require('break')
+        self.require_semicolon()
         return tree.BreakStatement()
 
     def parse_continue_stmt(self):
-        self.require('continue', ';')
+        self.require('continue')
+        self.require_semicolon()
         return tree.ContinueStatement()
 
     def parse_return_stmt(self):
         self.require('return')
-        if self.accept(';'):
+        if self.accept(';') or self.would_accept(self.NON_EXPR_BEGIN):
             return tree.ReturnStatement()
         expr = self.parse_testlist()
-        self.require(';')
+        self.require_semicolon()
         return tree.ReturnStatement(expr)
 
     def parse_yield_stmt(self):
         expr = self.parse_yield_expr()
-        self.require(';')
+        self.require_semicolon()
         return tree.ExpressionStatement(expr)
 
     def parse_raise_stmt(self):
         self.require('raise')
-        if self.accept(';'):
+        if self.accept(';') or self.would_accept(self.NON_EXPR_BEGIN):
             return tree.RaiseStatement()
         error = self.parse_test()
         from_expr = self.parse_if_accept(self.parse_test, 'from')
-        self.require(';')
+        self.require_semicolon()
         return tree.RaiseStatement(error, from_expr)
 
     def parse_import_stmt(self):
         self.require('import')
         imports = self.parse_listof(self.parse_dotted_name)
-        self.require(';')
+        self.require_semicolon()
         return tree.ImportStatement(imports)
 
     def parse_dotted_as_name(self):
@@ -335,7 +345,7 @@ class PyJavaParser:
             imports = []
         else:
             imports = self.parse_listof(self.parse_as_name)
-        self.require(';')
+        self.require_semicolon()
         return tree.ImportFromStatement(module, imports)
 
     def parse_as_name(self):
@@ -350,7 +360,7 @@ class PyJavaParser:
     def parse_global_stmt(self):
         self.require('global')
         names = self.parse_listof(self.parse_name)
-        self.require(';')
+        self.require_semicolon()
         for name in names:
             self.declvars(name)
         return tree.GlobalStatement(names)
@@ -358,7 +368,7 @@ class PyJavaParser:
     def parse_nonlocal_stmt(self):
         self.require('nonlocal')
         names = self.parse_listof(self.parse_name)
-        self.require(';')
+        self.require_semicolon()
         for name in names:
             self.declvars(name)
         return tree.NonLocalStatement(names)
@@ -367,7 +377,7 @@ class PyJavaParser:
         self.require('assert')
         test = self.parse_test()
         msg = self.parse_if_accept(self.parse_test, ',')
-        self.require(';')
+        self.require_semicolon()
         return tree.AssertStatement(test, msg)
 
     #endregion simple_stmt
@@ -913,6 +923,7 @@ class PyJavaParser:
             raise SyntaxError(f"unexpected token {simple_token_str(self.token)}", self.position)
 
     END_EXPR = (';', ')', ']', '}', ',', ':', ENDMARKER)
+    NON_EXPR_BEGIN = (*END_EXPR, *STMT_KEYWORDS)
     END_FACTOR = (*END_EXPR, '*', '**', '^', '@', '|', 
         '~', '=', '==', '!=', '/', '//', '<=', '>=', '<', '>', '<>', 
         'is', 'is not', 'in', 'not in', '%', '+=', '-=', '*=', '/=', '%=',
@@ -1151,12 +1162,12 @@ class PyJavaParser:
         elif not isinstance(arg, (tree.IndexExpression, tree.AttrExpression)):
             raise SyntaxError(f"not a valid lvalue: {arg}", self.position)
 
-def parse_file(file) -> List[tree.Statement]:
-    return PyJavaParser(tokenize(file.readline), getattr(file, 'name', '<unknown source>')).parse_file()
+def parse_file(file, optional_semicolons=False) -> List[tree.Statement]:
+    return PyJavaParser(tokenize(file.readline), getattr(file, 'name', '<unknown source>'), optional_semicolons).parse_file()
 
-def parse_str(s: str, encoding='utf-8') -> List[tree.Statement]:
+def parse_str(s: str, encoding='utf-8', optional_semicolons=False) -> List[tree.Statement]:
     import io
-    return PyJavaParser(tokenize(io.BytesIO(bytes(s, encoding)).readline), '<string>').parse_file()
+    return PyJavaParser(tokenize(io.BytesIO(bytes(s, encoding)).readline), '<string>', optional_semicolons).parse_file()
 
 
 class MultiContextManager:

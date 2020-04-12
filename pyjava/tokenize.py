@@ -46,7 +46,7 @@ blank_re = re.compile(br'^[ \t\f]*(?:[#\r\n]|$)', re.ASCII)
 
 import token
 __all__ = token.__all__ + ["tokenize", "detect_encoding", "KEYWORD", "KEYWORDS",
-                           "WALRUS",
+                           "WALRUS", "STMT_KEYWORDS",
                            "untokenize", "TokenInfo", "simple_token_str"]
 del token
 
@@ -60,6 +60,9 @@ KEYWORDS = {'if', 'elif', 'else', 'for', 'while', 'return', 'try', 'except',
     'finally', 'raise', 'from', 'import', 'as', 'in', 'is', 'not', 'and', 'or',
     'True', 'False', 'None', 'def', 'class', 'async', 'await', 'yield', 'with',
     'break', 'continue', 'lambda', 'del', 'global', 'nonlocal', 'assert', }
+STMT_KEYWORDS = {'if', 'elif', 'else', 'for', 'while', 'return', 'try', 'except',
+    'finally', 'raise', 'from', 'import', 'as', 'in', 'is', 'and', 'or', 'def',
+    'class', 'async', 'with', 'break', 'continue', 'del', 'global', 'nonlocal', 'assert', }
 
 EXACT_TOKEN_TYPES = {
     '(':   LPAR,

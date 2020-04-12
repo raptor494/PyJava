@@ -27,13 +27,15 @@ def main(args=None):
     parser = argparse.ArgumentParser(description='Parse a pyjava file')
     parser.add_argument('file', type=argparse.FileType('rb'),
                         help='The javapy file to parse')
+    parser.add_argument('--optional-semicolons', action='store_true',
+                        help="Make semicolons optional")
     parser.add_argument('--out', metavar='FILE', type=Path,
                         help='Where to save the output. Special name "STDOUT" can be used to output to the console.')
 
     args = parser.parse_args(args)
 
     with args.file as file:
-        unit = parse_file(file)
+        unit = parse_file(file, optional_semicolons=args.optional_semicolons)
 
     if hasattr(args, 'out'):
         if str(args.out) == 'STDOUT':
