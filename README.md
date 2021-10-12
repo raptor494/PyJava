@@ -3,11 +3,87 @@
 This project is the inverse of my [JavaPy project](https://github.com/raptor4694/JavaPy). It allows you to write Python code using semicolons and braces instead of indentation, like Java.
 
 ### Usage
-Call the program with `python pyjava.py <filename>` and it will output a file
+Call the program with `java -jar pyjava.jar <filename>` and it will output a file
 called the same thing except with a `.py` extension.
-Add the `--optional-semicolons` flag to make semicolons optional.
+You can use pyjavaconfig.json to configure parsing options.
 The program tries to format the file to be human-readable but may not be quite right in places. Use your own formatter as necessary.
 The parser does not *always* check for semantically invalid syntax, such as duplicate/missing variable names, duplicate functions, etc.
+
+### Config File
+The configuration file, if present, has the format
+```typescript
+{
+    "requireSemicolons"?: boolean = false,
+    "allowColonSimpleBlocks"?: boolean = true,
+    "allowNoColonSimpleBlocks": boolean = true,
+    "forceParensInStatements": boolean = true,
+    "files"?: {
+        "include"?: string[] = ["**.pyj"],
+        "exclude"?: string[] = []
+    }
+}
+```
+
+#### requireSemicolons
+Simply put, if this is `true` then semicolons will be required at the end of statements, as opposed to the default method which is similar to JavaScript's semicolon auto-insertion.
+
+Defaults to `false`.
+
+##### Example:
+Input:
+```python
+if (condition)
+    return 
+        getValue();
+```
+
+Output when `requireSemicolons` is false:
+```python
+if (condition):
+    return
+getValue()
+```
+
+Output when `requireSemicolons` is true:
+```python
+if (condition):
+    return getValue()
+```
+
+#### allowColonSimpleBlocks
+This allows you to have blocks consisting of a colon followed by a single statement, such as
+```python
+if condition: return True
+```
+
+Defaults to `true`.
+
+#### allowNoColonSimpleBlocks
+This allows you to have blocks consisting of a single statement, such as
+```python
+if condition
+    return True
+```
+
+Defaults to `true`.
+
+#### forceParensInStatements
+This option, when `true`, requires conditions in `if`, `while`, `for` and other statements to be surrounded by parenthesis.
+```python
+if (condition) { ... }
+
+while (condition) { ... }
+
+for (elem in values) { ... }
+```
+
+Defaults to `false`.
+
+#### files
+This object allows you to specify a list of files/folder globs to include and exclude from compilation.
+
+`include` defaults to `["**.pyj"]`.<br>
+`exclude` defaults to `[]`.
 
 ### Differences from Normal Python
 #### Simple Statements
@@ -90,4 +166,4 @@ dog = class(Animal)() {
 ### Notes
 1. The walrus operator `:=`, new in Python 3.8, is supported.
 2. The positional parameter syntax `/`, new in Python 3.8, is supported.
-3. I shouldn't have to mention this, but this project only supports Python 3.
+3. The match statement, new in Python 3.10, is supported.
