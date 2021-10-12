@@ -1,0 +1,26 @@
+from flask import Flask, render_template, request, redirect, session
+app = Flask(__name__)
+app.secret_key = "ILoveBraces"
+
+@app.route('/')
+def index():
+    try:
+        session['counter'] += 1
+    except:
+        session['counter'] = 0
+    return render_template('index.html')
+
+@app.route('/add', methods=["POST"])
+def add():
+    try:
+        session['counter'] += 2
+    except:
+        session['counter'] = 0
+    return render_template('index.html')
+
+@app.route('/rest', methods=["POST"])
+def reset():
+    session['counter'] = 0
+    return redirect('/')
+
+app.run(debug=True)

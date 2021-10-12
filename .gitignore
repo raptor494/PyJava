@@ -1,4 +1,40 @@
-**/*.pyc
+# Python
+.pyc
+__pycache__/
+
+# VS Code
 .vscode/
-**/*.code-workspace
-**/__pycache__/
+.code-workspace
+
+# Java
+*.class
+
+# Eclipse
+.settings/
+bin/
+tmp/
+.metadata
+.classpath
+.project
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.loadpath
+.factorypath
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+pom.xml.bak
+dependency-reduced-pom.xml
+
+# Antlr
+.antlr/
+
+# OS X
+.DS_Store
