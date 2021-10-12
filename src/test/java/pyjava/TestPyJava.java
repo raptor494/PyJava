@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.function.Supplier;
+
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
 import org.junit.jupiter.api.Test;
@@ -14,7 +16,9 @@ import pyjava.tree.LazyAppendable.AppendFunction;
 import pyjava.tree.Transpiler;
 
 class TestPyJava {
-    private static final boolean REQUIRE_SEMICOLONS = true, OPTIONAL_SEMICOLONS = false;
+    private static final int REQUIRE_SEMICOLONS = 1, OPTIONAL_SEMICOLONS = 0;
+    private static final int FORCE_PARENS = 1 << 1;
+    private static final int FORCE_PARENS_IN_RETURN = 1 << 2;
 
     @Test
     void test0() {
@@ -36,17 +40,16 @@ class TestPyJava {
 
     @Test
     void test1() {
-        assertThrows(ParseCancellationException.class, () -> 
+        var e = assertThrows(ParseCancellationException.class, () -> 
             runTest(
                 """
                 2 + 3 * 5
                 """,
                 REQUIRE_SEMICOLONS,
-                """
-                2 + 3 * 5
-                """
+                null
             )
         );
+        assertException(e.getCause(), FailedPredicateException.class, "expected semicolon");
     }
 
     @Test
@@ -363,11 +366,278 @@ class TestPyJava {
         );
     }
 
-    private static void runTest(String input, String expected) {
-        runTest(input, false, expected);
+    @Test
+    void test12() {
+        runTest(
+            """
+            if (condition) {
+                doStuff1();
+            } elif (condition2) {
+                doStuff2();
+            } else {
+                doStuff3();
+            }
+            while (condition) {
+                doStuff4();
+            }
+            for (var in exprs) {
+                doStuff5();
+            }
+            with (open(filename) as file) {
+                doStuff6();
+            }
+            try {
+                doStuff7();
+            } except (Exception as e) {
+                doStuff8();
+            }
+            """,
+            FORCE_PARENS | REQUIRE_SEMICOLONS,
+            """
+            if (condition):
+                doStuff1()
+            elif (condition2):
+                doStuff2()
+            else:
+                doStuff3()
+            while (condition):
+                doStuff4()
+            for var in exprs:
+                doStuff5()
+            with open(filename) as file:
+                doStuff6()
+            try:
+                doStuff7()
+            except Exception as e:
+                doStuff8()
+            """
+        );
     }
 
-    private static void runTest(String input, boolean requireSemicolons, String expected) {
+    @Test
+    void test13() {
+        var e = assertThrows(ParseCancellationException.class, () ->
+            runTest(
+                """
+                if condition {
+                    doStuff();
+                }
+                """,
+                FORCE_PARENS | REQUIRE_SEMICOLONS,
+                null
+            )
+        );
+        assertException(e.getCause(), NoViableAltException.class);
+    }
+
+    @Test
+    void test14() {
+        var e = assertThrows(ParseCancellationException.class, () ->
+            runTest(
+                """
+                while condition {
+                    doStuff();
+                }
+                """,
+                FORCE_PARENS | REQUIRE_SEMICOLONS,
+                null
+            )
+        );
+        assertException(e.getCause(), NoViableAltException.class);
+    }
+
+    @Test
+    void test15() {
+        var e = assertThrows(ParseCancellationException.class, () ->
+            runTest(
+                """
+                for var in exprs {
+                    doStuff();
+                }
+                """,
+                FORCE_PARENS | REQUIRE_SEMICOLONS,
+                null
+            )
+        );
+        assertException(e.getCause(), NoViableAltException.class);
+    }
+
+    @Test
+    void test16() {
+        var e = assertThrows(ParseCancellationException.class, () ->
+            runTest(
+                """
+                with open(filename) as file {
+                    doStuff();
+                }
+                """,
+                FORCE_PARENS | REQUIRE_SEMICOLONS,
+                null
+            )
+        );
+        assertException(e.getCause(), NoViableAltException.class);
+    }
+
+    @Test
+    void test17() {
+        var e = assertThrows(ParseCancellationException.class, () ->
+            runTest(
+                """
+                try {
+                    doStuff();
+                } except Exception as e {
+                    handleError();
+                }
+                """,
+                FORCE_PARENS | REQUIRE_SEMICOLONS,
+                null
+            )
+        );
+        assertException(e.getCause(), NoViableAltException.class);
+    }
+
+    @Test
+    void test18() {
+        var e = assertThrows(ParseCancellationException.class, () ->
+            runTest(
+                """
+                assert True
+                """,
+                FORCE_PARENS | FORCE_PARENS_IN_RETURN | OPTIONAL_SEMICOLONS,
+                null
+            )
+        );
+        assertException(e.getCause(), NoViableAltException.class);
+    }
+
+    @Test
+    void test19() {
+        var e = assertThrows(ParseCancellationException.class, () ->
+            runTest(
+                """
+                return x
+                """,
+                FORCE_PARENS | FORCE_PARENS_IN_RETURN | OPTIONAL_SEMICOLONS,
+                null
+            )
+        );
+        assertException(e.getCause(), NoViableAltException.class);
+    }
+
+    @Test
+    void test20() {
+        var e = assertThrows(ParseCancellationException.class, () ->
+            runTest(
+                """
+                raise Exception
+                """,
+                FORCE_PARENS | FORCE_PARENS_IN_RETURN | OPTIONAL_SEMICOLONS,
+                null
+            )
+        );
+        assertException(e.getCause(), NoViableAltException.class);
+    }
+
+    @Test
+    void test21() {
+        var e = assertThrows(ParseCancellationException.class, () ->
+            runTest(
+                """
+                del x.y
+                """,
+                FORCE_PARENS | FORCE_PARENS_IN_RETURN | OPTIONAL_SEMICOLONS,
+                null
+            )
+        );
+        assertException(e.getCause(), NoViableAltException.class);
+    }
+
+    @Test
+    void test22() {
+        var e = assertThrows(ParseCancellationException.class, () ->
+            runTest(
+                """
+                yield z
+                """,
+                FORCE_PARENS | FORCE_PARENS_IN_RETURN | OPTIONAL_SEMICOLONS,
+                null
+            )
+        );
+        assertException(e.getCause(), NoViableAltException.class);
+    }
+
+    @Test
+    void test23() {
+        runTest(
+            """
+            return
+            return (x)
+            yield
+            yield from (y)
+            raise
+            raise (Exception)
+            assert (condition)
+            assert (condition, )
+            assert (condition, "message")
+            del (x.y)
+            match (x) {
+                case (0) { ... }
+                case (y) { ... }
+            }
+            """,
+            FORCE_PARENS | FORCE_PARENS_IN_RETURN | OPTIONAL_SEMICOLONS,
+            """
+            return
+            return (x)
+            yield
+            yield from (y)
+            raise
+            raise (Exception)
+            assert (condition)
+            assert (condition)
+            assert (condition), ("message")
+            del x.y
+            match (x):
+                case 0:
+                    ...
+                case y:
+                    ...
+            """
+        );
+    }
+
+    @Test
+    void test24() {
+        String input = """
+            assert (condition)
+            assert (condition,)
+            assert (condition, "message")
+            """;
+        runTest(
+            input,
+            FORCE_PARENS | FORCE_PARENS_IN_RETURN | OPTIONAL_SEMICOLONS,
+            """
+            assert (condition)
+            assert (condition)
+            assert (condition), ("message")
+            """
+        );
+        runTest(
+            input,
+            OPTIONAL_SEMICOLONS,
+            """
+            assert (condition)
+            assert (condition,)
+            assert (condition, "message")
+            """
+        );
+    }
+
+    private static void runTest(String input, String expected) {
+        runTest(input, 0, expected);
+    }
+
+    private static void runTest(String input, int flags, String expected) {
         var source = CharStreams.fromString(input);
         var lexer = new PyJavaLexer(source);
         lexer.addErrorListener(new ConsoleErrorListener() {
@@ -378,14 +648,33 @@ class TestPyJava {
             }
         });
         var tokens = new CommonTokenStream(lexer);
-        var parser = new PyJavaParser(tokens);
+        var parser = new PyJavaParser(tokens,
+            PyJavaOptions.builder()
+            .requireSemicolons((flags & REQUIRE_SEMICOLONS) != 0)
+            .forceParensInStatements((flags & FORCE_PARENS) != 0)
+            .forceParensInReturnYieldRaise((flags & FORCE_PARENS_IN_RETURN) != 0)
+            .build()
+        );
         parser.setErrorHandler(new BailErrorStrategy());
-        parser.setOptions(PyJavaOptions.builder().requireSemicolons(requireSemicolons).build());
         var file = parser.file();
         var transpiler = new Transpiler();
         file.accept(transpiler);
         var sb = new StringBuilder();
         transpiler.appendTo(AppendFunction.wrap(sb));
         assertEquals(expected, sb.toString());
+    }
+
+    private static void assertException(Throwable e, Class<? extends Throwable> exceptionType) {
+        assertTrue(exceptionType.isInstance(e), () -> "cause was not "+exceptionType.getName()+", was "+(e.getCause() == null? "null" : e.getCause().getClass().getName()));
+    }
+
+    private static void assertException(Throwable e, Class<? extends Throwable> exceptionType, String message) {
+        assertTrue(exceptionType.isInstance(e), () -> "cause was not "+exceptionType.getName()+", was "+(e == null? "null" : e.getClass().getName()));
+        assertEquals(e.getMessage(), message);
+    }
+
+    private static void assertException(Throwable e, Class<? extends Throwable> exceptionType, Supplier<? extends String> message) {
+        assertTrue(exceptionType.isInstance(e), () -> "cause was not "+exceptionType.getName()+", was "+(e == null? "null" : e.getClass().getName()));
+        assertEquals(e.getMessage(), message.get());
     }
 }

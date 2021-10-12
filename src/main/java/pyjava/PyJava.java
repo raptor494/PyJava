@@ -166,6 +166,9 @@ public class PyJava {
                 if (jsonObj.containsKey("forceParensInStatements")) {
                     optionsBuilder.forceParensInStatements(getBoolean(jsonObj, "forceParensInStatements"));
                 }
+                if (jsonObj.containsKey("forceParensInReturnYieldRaise")) {
+                    optionsBuilder.forceParensInReturnYieldRaise(getBoolean(jsonObj, "forceParensInReturnYieldRaise"));
+                }
                 if (jsonObj.containsKey("files")) {
                     var files = getObject(jsonObj, "files");
                     if (files.containsKey("include")) {

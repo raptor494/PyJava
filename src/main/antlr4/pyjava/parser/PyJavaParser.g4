@@ -25,7 +25,7 @@ statement
   : ';'                                                             # EmptyStatement
   | assignment eos                                                  # AssignmentStatement
   | starExpressions eos                                             # ExpressionStatement
-  | 'return' ({notLineTerminator()}? starExpressions)? eos          # ReturnStatement
+  | 'return' retVal? eos          # ReturnStatement
   | yieldExpression eos                                                   # YieldStatement
   | 'raise' {notLineTerminator()}? expression {notLineTerminator()}? 'from' expression eos # RaiseFromStatement
   | 'raise' ({notLineTerminator()}? expression)? eos                # RaiseStatement
@@ -33,7 +33,10 @@ statement
   | 'from' importFromName 'import' importFromTargets eos            # FromImportStatement
   | 'pass' eos                                                      # EmptyStatement
   | 'del' delTargets eos                                            # DelStatement
-  | 'assert' expression (',' expression)? eos                       # AssertStatement
+  | {!options.forceParensInReturnYieldRaise()}?
+    'assert' expression (',' expression)? eos                       # AssertStatement
+  | {options.forceParensInReturnYieldRaise()}?
+    'assert' '(' namedExpression (',' namedExpression)? ','? ')' eos          # AssertStatement
   | 'break' eos                                                     # BreakStatement
   | 'continue' eos                                                  # ContinueStatement
   | 'global' identifier (',' identifier)* eos                       # GlobalStatement
@@ -46,7 +49,12 @@ statement
   | 'async'? 'with' withItems block                                 # WithStatement
   | 'try' block finallyBlock                                        # TryFinallyStatement
   | 'try' block exceptBlock+ elseBlock? finallyBlock?               # TryExceptStatement
-  | 'match' {notLineTerminator()}? subjectExpr '{' caseBlock+ '}'   # MatchStatement
+  | 'match' {notLineTerminator()}? subjectExprCond '{' caseBlock+ '}'   # MatchStatement
+  ;
+
+retVal
+  : {options.forceParensInReturnYieldRaise()}? {notLineTerminator()}? '(' starExpressions? ')'
+  | {!options.forceParensInReturnYieldRaise()}? {notLineTerminator()}? starExpressions
   ;
 
 assignment
@@ -99,13 +107,13 @@ elseBlock
   ;
 
 forLoopHeader
-  : starTargets 'in' starExpressions
-  | '(' starTargets 'in' starExpressions ')'
+  : '(' starTargets 'in' starExpressions ')'
+  | {!options.forceParensInStatements()}? starTargets 'in' starExpressions
   ;
 
 withItems
   : '(' withItem (',' withItem)* ','? ')'
-  | withItem (',' withItem)*
+  | {!options.forceParensInStatements()}? withItem (',' withItem)*
   ;
 
 withItem
@@ -117,12 +125,17 @@ exceptBlock
   ;
 
 exceptItem
-  : expression ('as' identifier)?
-  | '(' expression ('as' identifier)? ')'
+  : '(' expression ('as' identifier)? ')'
+  | {!options.forceParensInStatements()}? expression ('as' identifier)?
   ;
 
 finallyBlock
   : 'finally' block
+  ;
+
+subjectExprCond
+  : {options.forceParensInStatements()}? namedExpressionCond
+  | {!options.forceParensInStatements()}? subjectExpr
   ;
 
 subjectExpr
@@ -131,11 +144,12 @@ subjectExpr
   ;
 
 caseBlock
-  : 'case' patterns guard? block
+  : {options.forceParensInReturnYieldRaise()}? 'case' '(' patterns? ')' guard? block
+  | {!options.forceParensInReturnYieldRaise()}? 'case' patterns guard? block
   ;
 
 guard
-  : 'if' namedExpression
+  : 'if' namedExpressionCond
   ;
 
 
@@ -176,7 +190,8 @@ dottedName
 
 
 delTargets
-  : delTarget (',' delTarget)*
+  : '(' (delTarget (',' delTarget)* ','?)? ')'
+  | {!options.forceParensInReturnYieldRaise()}? delTarget (',' delTarget)*
   ;
 
 delTarget
@@ -429,7 +444,8 @@ assignmentExpression
   ;
 
 namedExpressionCond
-  : {options.forceParensInStatements()}? 'not'? '(' namedExpression ')'
+  : {options.forceParensInStatements()}? 'not'? 
+    {next(LPAREN)}? atom
   | {!options.forceParensInStatements()}? namedExpression
   ;
 
@@ -645,7 +661,7 @@ atom
   | 'None'                                                      # NoneAtom
   | strings                                                     # StringsAtom
   | NUMBER                                                      # NumberAtom
-  | '(' yieldExpression ')'                                           # GroupAtom
+  | '(' yieldExpression ')'                                     # GroupAtom
   | '(' namedExpression ')'                                     # GroupAtom
   | '(' (starNamedExpressions {((TupleAtomContext)$ctx).starNamedExpressions().COMMA(0) != null}?)? ')' # TupleAtom
   | genExp                                                      # GenExpAtom
@@ -689,8 +705,13 @@ genExp
   ;
 
 yieldExpression
-  : 'yield' {notLineTerminator()}? 'from' expression
-  | 'yield' ({notLineTerminator()}? starExpressions)?
+  : 'yield' {notLineTerminator()}? 'from' 
+    ( {!options.forceParensInReturnYieldRaise()}? 
+      expression
+    | {options.forceParensInReturnYieldRaise()}?
+      {next(LPAREN)}? atom
+    )
+  | 'yield' retVal?
   ;
 
 
@@ -776,5 +797,8 @@ eos
     ( EOF
     | {lineTerminatorAhead()}?
     | {closeBrace()}?
+    // | {options.forceParensInReturnYieldRaise()}?
+    //| {if(true) throw new FailedPredicateException(this, "false", "expected semicolon or end of statement");}
     )
+  | {options.requireSemicolons()}? {if(true) throw new FailedPredicateException(this, "false", "expected semicolon");} /*{false}?<fail='expected semicolon'>*/
   ;

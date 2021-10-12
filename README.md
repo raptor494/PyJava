@@ -15,8 +15,9 @@ The configuration file, if present, has the format
 {
     "requireSemicolons"?: boolean = false,
     "allowColonSimpleBlocks"?: boolean = true,
-    "allowNoColonSimpleBlocks": boolean = true,
-    "forceParensInStatements": boolean = true,
+    "allowNoColonSimpleBlocks"?: boolean = true,
+    "forceParensInStatements"?: boolean = false,
+    "forceParensInReturnYieldRaise"?: boolean = false,
     "files"?: {
         "include"?: string[] = ["**.pyj"],
         "exclude"?: string[] = []
@@ -75,6 +76,18 @@ if (condition) { ... }
 while (condition) { ... }
 
 for (elem in values) { ... }
+```
+
+Defaults to `false`.
+
+#### forceParensInReturnYieldRaise
+This option, when `true`, requires the values of `return`, `yield`, `assert`, `raise`, and basically any other statement which accepts an expression immediately following its keyword, to be enclosed by parenthesis.
+```python
+return (value)
+raise (Exception)
+yield (element)
+assert (condition, "message")
+del (x.y, z[0])
 ```
 
 Defaults to `false`.
@@ -150,7 +163,7 @@ The syntax is this:
 If superclass arguments are provided, the hidden name of the class will try to be similar to the first superclass defined. Otherwise, it will be similar to 'object'.
 
 **Example**:
-```python
+```ruby
 class Animal(ABC) {
     @abstractmethod
     def speak(self) {}

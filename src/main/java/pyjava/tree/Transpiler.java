@@ -347,13 +347,35 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     public Void visitReturnStatement(ReturnStatementContext ctx) {
         newStatement();
         a.append("return");
-        var starExpressions = ctx.starExpressions();
-        if (starExpressions != null) {
+        // var starExpressions = ctx.starExpressions();
+        // if (starExpressions != null) {
+        //     a.append(' ');
+        //     starExpressions.accept(this);
+        // }
+        var retVal = ctx.retVal();
+        if (retVal != null) {
             a.append(' ');
-            starExpressions.accept(this);
+            retVal.accept(this);
         }
         a.newline();
         endStatement();
+        return null;
+    }
+
+    @Override
+    public Void visitRetVal(RetValContext ctx) {
+        var starExpressions = ctx.starExpressions();
+        if (ctx.LPAREN() != null) {
+            if (starExpressions != null) {
+                a.append('(');
+                starExpressions.accept(this);
+                a.append(')');
+            } else {
+                a.append("()");
+            }
+        } else {
+            starExpressions.accept(this);
+        }
         return null;
     }
 
@@ -369,13 +391,17 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitYieldExpression(YieldExpressionContext ctx) {
         var expression = ctx.expression();
-        var starExpressions = ctx.starExpressions();
+        var atom = ctx.atom();
+        var retVal = ctx.retVal();
         if (expression != null) {
             a.append("yield from ");
             expression.accept(this);
-        } else if (starExpressions != null) {
+        } else if (atom != null) {
+            a.append("yield from ");
+            atom.accept(this);
+        } else if (retVal != null) {
             a.append("yield ");
-            starExpressions.accept(this);
+            retVal.accept(this);
         } else {
             a.append("yield");
         }
@@ -526,10 +552,14 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitDelTargets(DelTargetsContext ctx) {
         var iter = ctx.delTarget().iterator();
-        iter.next().accept(this);
-        while (iter.hasNext()) {
-            a.append(", ");
+        if (iter.hasNext()) {
             iter.next().accept(this);
+            while (iter.hasNext()) {
+                a.append(", ");
+                iter.next().accept(this);
+            }
+        } else {
+            a.append("()");
         }
         return null;
     }
@@ -597,11 +627,24 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     public Void visitAssertStatement(AssertStatementContext ctx) {
         newStatement();
         a.append("assert ");
-        var iter = ctx.expression().iterator();
-        iter.next().accept(this);
-        if (iter.hasNext()) {
-            a.append(", ");
+        
+        if (ctx.LPAREN() != null) {
+            var iter = ctx.namedExpression().iterator();
+            a.append('(');
             iter.next().accept(this);
+            a.append(')');
+            if (iter.hasNext()) {
+                a.append(", (");
+                iter.next().accept(this);
+                a.append(')');
+            }
+        } else {
+            var iter = ctx.expression().iterator();
+            iter.next().accept(this);
+            if (iter.hasNext()) {
+                a.append(", ");
+                iter.next().accept(this);
+            }
         }
         a.newline();
         endStatement();
@@ -1042,14 +1085,12 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
 
     @Override
     public Void visitNamedExpressionCond(NamedExpressionCondContext ctx) {
-        if (ctx.LPAREN() != null) {
+        var atom = ctx.atom();
+        if (atom != null) {
             if (ctx.NOT() != null) {
-                a.append("not (");
-            } else {
-                a.append('(');
+                a.append("not ");
             }
-            ctx.namedExpression().accept(this);
-            a.append(')');
+            atom.accept(this);
         } else {
             ctx.namedExpression().accept(this);
         }
@@ -1304,13 +1345,24 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     public Void visitMatchStatement(MatchStatementContext ctx) {
         newStatement();
         a.append("match ");
-        ctx.subjectExpr().accept(this);
+        ctx.subjectExprCond().accept(this);
         a.append(':').incrIndent().newline();
         for (var caseBlock : ctx.caseBlock()) {
             caseBlock.accept(this);
         }
         a.decrIndentNewline();
         endStatement();
+        return null;
+    }
+
+    @Override
+    public Void visitSubjectExprCond(SubjectExprCondContext ctx) {
+        var namedExprCond = ctx.namedExpressionCond();
+        if (namedExprCond != null) {
+            namedExprCond.accept(this);
+        } else {
+            ctx.subjectExpr().accept(this);
+        }
         return null;
     }
 
@@ -1335,7 +1387,12 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitCaseBlock(CaseBlockContext ctx) {
         a.append("case ");
-        ctx.patterns().accept(this);
+        var patterns = ctx.patterns();
+        if (patterns != null) {
+            patterns.accept(this);
+        } else {
+            a.append("()");
+        }
         var guard = ctx.guard();
         if (guard != null) {
             a.append(' ');
@@ -1348,7 +1405,7 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitGuard(GuardContext ctx) {
         a.append("if ");
-        ctx.namedExpression().accept(this);
+        ctx.namedExpressionCond().accept(this);
         return null;
     }
 
@@ -1719,14 +1776,19 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
                 a.append("lambda: ");
             }
             if (onlyStmt instanceof ReturnStatementContext retStmt) {
-                var starExpressions = retStmt.starExpressions();
-                if (starExpressions != null) {
-                    if (starExpressions.COMMA(0) != null) {
-                        a.append('(');
-                        starExpressions.accept(this);
-                        a.append(')');
+                var retVal = retStmt.retVal();
+                if (retVal != null) {
+                    var starExpressions = retVal.starExpressions();
+                    if (starExpressions != null) {
+                        if (starExpressions.COMMA(0) != null) {
+                            a.append('(');
+                            starExpressions.accept(this);
+                            a.append(')');
+                        } else {
+                            starExpressions.accept(this);
+                        }
                     } else {
-                        starExpressions.accept(this);
+                        a.append("None");
                     }
                 } else {
                     a.append("None");
