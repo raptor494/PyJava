@@ -9,11 +9,11 @@ options {
 }
 
 BLOCK_COMMENT
-  : /* {!isInTemplateString()}? */ '#{' .*? '}' -> skip
+  : /* {!isInTemplateString()}? */ '#{' .*? '#}' -> channel(HIDDEN)
   ;
 
 LINE_COMMENT
-  : /* {!isInTemplateString()}? */ '#' ~[\r\n\f]* -> skip
+  : /* {!isInTemplateString()}? */ '#' (~[{\r\n\f] (~[\r\n\f])*)? -> channel(HIDDEN)
   ;
 
 NUMBER
@@ -177,7 +177,7 @@ COLONEQ: ':=';
 
 SPACES: [ \t\f]+ -> skip;
 NEWLINE: '\r'? '\n' {
-    if (inCurlyBrackets() || !inBrackets()) {
+    if (inCurlyBracketsOrNone()) {
         setChannel(HIDDEN);
     } else {
         skip();

@@ -92,7 +92,7 @@ class TestPyJava {
             """,
             """
             from random import randrange
-            elems = [randrange(10) for _ in range(10)]
+            elems = [randrange(10) for _ in range(10)] # Generate 10 random integers from 0 to 9
             def __lambda0(elem):
                 if elem < 10:
                     return True
@@ -730,6 +730,534 @@ class TestPyJava {
         );
     }
 
+    @Test
+    void test26() {
+        runTest(
+            """
+            # Line comment test
+            #{
+                Block comment Test
+                Block comment Test line 2
+            #} x = 3
+            y = 4 # Comment after statement Test
+            """,
+
+            """
+            # Line comment test
+            # Block comment Test
+            # Block comment Test line 2
+            x = 3
+            y = 4 # Comment after statement Test
+            """
+        );
+    }
+
+    @Test
+    void test27() {
+        runTest(
+            """
+            x = 3 #Comment after statement
+            #Comment before statement
+            y = 4
+            """,
+
+            """
+            x = 3 # Comment after statement
+            # Comment before statement
+            y = 4
+            """
+        );
+    }
+
+    @Test
+    void test28() {
+        runTest(
+            """
+            # Comment before decorator
+            @decorator # Comment after decorator
+            # Comment between decorator and function
+            def function() {}
+            """,
+
+            """
+            # Comment before decorator
+            @decorator # Comment after decorator
+            # Comment between decorator and function
+            def function():
+                pass
+            """
+        );
+    }
+
+    @Test
+    void test29() {
+        runTest(
+            """
+            # Comment before function
+            def function() #{ Comment after function params #} {}
+            """,
+
+            """
+            # Comment before function
+            def function(): # Comment after function params
+                pass
+            """
+        );
+    }
+
+    @Test
+    void test30() {
+        runTest(
+            """
+            def function() # Comment after function params
+            #{
+            # Comment before 
+            # function body
+            #}
+            {
+                # Function body
+            }
+            """,
+            
+            """
+            def function(): # Comment after function params
+                # Comment before
+                # function body
+                pass
+                # Function body
+            """
+        );
+    }
+
+    @Test
+    void test31() {
+        runTest(
+            """
+            #{
+                Block comment
+                style #1:
+                 indented
+            #}
+            """,
+            
+            """
+            # Block comment
+            # style #1:
+            #  indented
+            """
+        );
+    }
+
+    @Test
+    void test32() {
+        runTest(
+            """
+            #{
+            # Block comment
+            # style #2:
+            #  preceding hashtags
+            #}  
+            """,
+
+            """
+            # Block comment
+            # style #2:
+            #  preceding hashtags
+            """
+        );
+    }
+
+    @Test
+    void test33() {
+        runTest(
+            """
+            #{
+            # Block comment
+            # style #2a:
+            #  preceding hashtags, close brace
+            #  is on same line as last text line #}
+            """,
+
+            """
+            # Block comment
+            # style #2a:
+            #  preceding hashtags, close brace
+            #  is on same line as last text line
+            """
+        );
+    }
+
+    @Test
+    void test34() {
+        runTest(
+            """
+            #{
+            # invalid block
+             # comment preceding
+             #hashtags,
+           #result may look weird
+            #}
+            """,
+
+            """
+            #  # invalid block
+            #   # comment preceding
+            #   #hashtags,
+            # #result may look weird
+            """
+        );
+    }
+
+    @Test
+    void test35() {
+        runTest(
+            """
+            #{ Block comment
+               style #3:
+                first text line is on same
+                line as opening brace
+            #}
+            """,
+
+            """
+            # Block comment
+            # style #3:
+            #  first text line is on same
+            #  line as opening brace
+            """
+        );
+    }
+
+    @Test
+    void test36() {
+        runTest(
+            """
+            x = 0 #{ Block comment
+                     following statement 
+                     is treated special #}
+            """,
+
+            """
+            x = 0 # Block comment following statement is treated special
+            """
+        );
+    }
+
+    @Test
+    void test37() {
+        runTest(
+            """
+            # Comment before class decorator
+            @decorator # Comment after decorator
+            # Comment before class
+            class A # Comment after class
+            # Comment before class body
+            {
+                # Class body
+            }
+            """,
+            
+            """
+            # Comment before class decorator
+            @decorator # Comment after decorator
+            # Comment before class
+            class A: # Comment after class
+                # Comment before class body
+                pass
+                # Class body
+            """
+        );
+    }
+
+    @Test
+    void test38() {
+        runTest(
+            """
+            @decorator1 @decorator2 def foo() { ... }
+            """,
+
+            """
+            @decorator1
+            @decorator2
+            def foo(): ...
+            """
+        );
+    }
+
+    @Test
+    void test39() {
+        runTest(
+            """
+            @x := decorator1(args) @decorator2(x)
+            def foo() { ... }
+            """,
+
+            """
+            @x := decorator1(args)
+            @decorator2(x)
+            def foo(): ...
+            """
+        );
+    }
+
+    @Test
+    void test40() {
+        runTest(
+            """
+            @(value1 @ value2)
+            def foo() { ... }
+            """,
+
+            """
+            @(value1 @ value2)
+            def foo(): ...
+            """
+        );
+    }
+
+    @Test
+    void test41() {
+        runTest(
+            """
+            @decorator[x @ y]
+            def foo() { ... }
+            """,
+
+            """
+            @decorator[x @ y]
+            def foo(): ...
+            """
+        );
+    }
+
+    @Test
+    void test42() {
+        runTest(
+            """
+            @decorator(x @ y for x, y in items)
+            def foo() { ... }
+            """,
+        
+            """
+            @decorator(x @ y for x, y in items)
+            def foo(): ...    
+            """
+        );
+    }
+
+    @Test
+    void test43() {
+        runTest(
+            """
+            @decorator(x @ y, x / y)
+            def foo() { ... }
+            """,
+            
+            """
+            @decorator(x @ y, x / y)
+            def foo(): ...
+            """
+        );
+    }
+
+    @Test
+    void test44() {
+        runTest(
+            """
+            @decorator1 if x @ y else decorator2 @decorator3
+            def foo() { ... }
+            """,
+
+            """
+            @decorator1 if x @ y else decorator2
+            @decorator3
+            def foo(): ...
+            """
+        );
+    }
+
+    @Test
+    void test45() {
+        runTest(
+            """
+            try # Comment after try
+            {
+                foo();
+            }
+            except Exception # Comment after except
+            {
+                handle();
+            }
+            else # Comment after else
+            {
+                bar();
+            }
+            finally # Comment after finally
+            {
+                finish();
+            }
+            """,
+
+            """
+            try: # Comment after try
+                foo()
+            except Exception: # Comment after except
+                handle()
+            else: # Comment after else
+                bar()
+            finally: # Comment after finally
+                finish()
+            """
+        );
+    }
+
+    @Test
+    void test46() {
+        runTest(
+            """
+            try { # Comment after try
+                foo();
+            } except Exception { # Comment after except
+                handle();
+            } else { # Comment after else
+                bar();
+            } finally { # Comment after finally
+                finish();
+            }
+            """,
+            
+            """
+            try: # Comment after try
+                foo()
+            except Exception: # Comment after except
+                handle()
+            else: # Comment after else
+                bar()
+            finally: # Comment after finally
+                finish()
+            """
+        );
+    }
+
+    @Test
+    void test47() {
+        runTest(
+            """
+            try: # Comment after try
+                foo();
+            except Exception: # Comment after except
+                handle();
+            else: # Comment after else
+                bar();
+            finally: # Comment after finally
+                finish();
+            """,
+            
+            """
+            try: # Comment after try
+                foo()
+            except Exception: # Comment after except
+                handle()
+            else: # Comment after else
+                bar()
+            finally: # Comment after finally
+                finish()
+            """
+        );
+    }
+
+    @Test
+    void test48() {
+        runTest(
+            """
+            try #{ Comment after try #} {
+                foo();
+            } except Exception #{ Comment after except #} {
+                handle();
+            } else #{ Comment after else #} {
+                bar();
+            } finally #{ Comment after finally #} {
+                finish();
+            }
+            """,
+
+            """
+            try: # Comment after try
+                foo()
+            except Exception: # Comment after except
+                handle()
+            else: # Comment after else
+                bar()
+            finally: # Comment after finally
+                finish()
+            """
+        );
+    }
+
+    @Test
+    void test49() {
+        runTest(
+            """
+            # Comment before match
+            match expr # Comment after match
+            {
+                # Comment before case
+                case 0 # Comment after case
+                {}
+                case 1 {}
+            }
+            """,
+
+            """
+            # Comment before match
+            match expr: # Comment after match
+                # Comment before case
+                case 0: # Comment after case
+                    pass
+                case 1: pass
+            """
+        );
+    }
+
+    @Test
+    void test50() {
+        runTest(
+            """
+            # Comment before match
+            match expr { # Comment after match
+                # Comment before case
+                case 0 { # Comment after case
+                    pass;
+                }
+                case 1 {}
+            }
+            """,
+
+            """
+            # Comment before match
+            match expr: # Comment after match
+                # Comment before case
+                case 0: # Comment after case
+                    pass
+                case 1: pass
+            """
+        );
+    }
+
+    /*  (Blank test body for quick copy-paste)
+
+        runTest(
+            """
+            
+            """,
+
+            """
+            
+            """
+        );
+
+    */
+        
     private static void runTest(String input, String expected) {
         runTest(input, 0, expected);
     }
@@ -737,13 +1265,9 @@ class TestPyJava {
     private static void runTest(String input, int flags, String expected) {
         var source = CharStreams.fromString(input);
         var lexer = new PyJavaLexer(source);
-        lexer.addErrorListener(new ConsoleErrorListener() {
-            @Override
-            public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol, int line,
-                    int charPositionInLine, String msg, RecognitionException e) {
-                throw e;
-            }
-        });
+        var errorListener = new BaseErrorListener();
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(errorListener);
         var tokens = new CommonTokenStream(lexer);
         var parser = new PyJavaParser(tokens,
             PyJavaOptions.builder()
@@ -753,6 +1277,8 @@ class TestPyJava {
             .build()
         );
         parser.setErrorHandler(new BailErrorStrategy());
+        //parser.removeErrorListeners();
+        parser.addErrorListener(errorListener);
         var file = parser.file();
         var transpiler = new Transpiler();
         file.accept(transpiler);

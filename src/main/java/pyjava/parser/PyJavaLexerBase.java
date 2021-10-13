@@ -106,6 +106,9 @@ public abstract class PyJavaLexerBase extends Lexer {
         return !brackets.isEmpty() && switch (brackets.peek()) { case SQUARE, PAREN -> true; default -> false; };
     }
 
+    protected boolean inCurlyBracketsOrNone() {
+        return inCurlyBrackets() || brackets.isEmpty();
+    }
 
     protected void enterBracket(char openChar) {
         brackets.push(BracketType.fromOpenChar(openChar));

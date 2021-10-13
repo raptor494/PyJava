@@ -6,6 +6,9 @@ options {
 }
 
 @header {
+import java.util.List;
+import java.util.ArrayList;
+
 import pyjava.PyJavaOptions;
 }
 
@@ -17,42 +20,46 @@ import pyjava.PyJavaOptions;
 }
 
 file
-  : statement* EOF
+  : statement* comments EOF
   ;
 
 
 statement
-  : ';'                                                             # EmptyStatement
-  | assignment eos                                                  # AssignmentStatement
-  | starExpressions eos                                             # ExpressionStatement
-  | 'return' retVal? eos          # ReturnStatement
-  | yieldExpression eos                                                   # YieldStatement
+returns [List<Token> commentTokens]
+@init {
+    $commentTokens = getPrecedingLineComments();
+}
+  : ';' comment                            # EmptyStatement
+  | assignment eos                                                   # AssignmentStatement
+  | starExpressions eos                                              # ExpressionStatement
+  | 'return' retVal? eos                                             # ReturnStatement
+  | yieldExpression eos                                              # YieldStatement
   | {!options.forceParensInReturnYieldRaise()}?
-    'raise' {notLineTerminator()}? expression {notLineTerminator()}? 'from' expression eos # RaiseFromStatement
+    'raise' {notLineTerminator()}? expression {notLineTerminator()}? 'from' expression eos                   # RaiseFromStatement
   | {options.forceParensInReturnYieldRaise()}?
     'raise' {notLineTerminator()}? namedExpressionCond {notLineTerminator()}? 'from' namedExpressionCond eos # RaiseFromStatement
-  | 'raise' retVal? eos                # RaiseStatement
-  | 'import' dottedAsNames eos                                      # ImportStatement
-  | 'from' importFromName 'import' importFromTargets eos            # FromImportStatement
-  | 'pass' eos                                                      # EmptyStatement
-  | 'del' delTargets eos                                            # DelStatement
+  | 'raise' retVal? eos                                               # RaiseStatement
+  | 'import' dottedAsNames eos                                        # ImportStatement
+  | 'from' importFromName 'import' importFromTargets eos              # FromImportStatement
+  | 'pass' eos                                                        # EmptyStatement
+  | 'del' delTargets eos                                              # DelStatement
   | {!options.forceParensInReturnYieldRaise()}?
-    'assert' expression (',' expression)? eos                       # AssertStatement
+    'assert' expression (',' expression)? eos                         # AssertStatement
   | {options.forceParensInReturnYieldRaise()}?
-    'assert' '(' namedExpression (',' namedExpression)? ','? ')' eos          # AssertStatement
-  | 'break' eos                                                     # BreakStatement
-  | 'continue' eos                                                  # ContinueStatement
-  | 'global' identifier (',' identifier)* eos                       # GlobalStatement
-  | 'nonlocal' identifier (',' identifier)* eos                     # NonLocalStatement
-  | decorators? funcHeader retType? STRING_LITERAL? funcBody        # FunctionDef
-  | decorators? classHeader STRING_LITERAL? classBody               # ClassDef
-  | 'if' namedExpressionCond block elif* elseBlock?                     # IfStatement
-  | 'while' namedExpressionCond block elseBlock?                        # WhileLoop
-  | 'async'? 'for' forLoopHeader block elseBlock?                   # ForLoop
-  | 'async'? 'with' withItems block                                 # WithStatement
-  | 'try' block finallyBlock                                        # TryFinallyStatement
-  | 'try' block exceptBlock+ elseBlock? finallyBlock?               # TryExceptStatement
-  | 'match' {notLineTerminator()}? subjectExprCond '{' caseBlock+ '}'   # MatchStatement
+    'assert' '(' namedExpression (',' namedExpression)? ','? ')' eos  # AssertStatement
+  | 'break' eos                                                       # BreakStatement
+  | 'continue' eos                                                    # ContinueStatement
+  | 'global' identifier (',' identifier)* eos                         # GlobalStatement
+  | 'nonlocal' identifier (',' identifier)* eos                       # NonLocalStatement
+  | decorators? funcHeader retType? comment comments STRING_LITERAL? funcBody          # FunctionDef
+  | decorators? classHeader comment comments STRING_LITERAL? classBody                 # ClassDef
+  | 'if' namedExpressionCond block elif* elseBlock?                   # IfStatement
+  | 'while' namedExpressionCond block elseBlock?                      # WhileLoop
+  | 'async'? 'for' forLoopHeader block elseBlock?                     # ForLoop
+  | 'async'? 'with' withItems block                                   # WithStatement
+  | 'try' block finallyBlock                                          # TryFinallyStatement
+  | 'try' block exceptBlock+ elseBlock? finallyBlock?                 # TryExceptStatement
+  | 'match' {notLineTerminator()}? subjectExprCond comment '{' ({lineTerminatorAhead()}? comment)? caseBlock+ '}' # MatchStatement
   ;
 
 retVal
@@ -96,16 +103,24 @@ singleSubscriptAttributeTarget
   ;
 
 block
-  : '{' statement* '}'
-  | {options.allowColonSimpleBlocks()}? ':' {!next(SEMI)}? statement
-  | {options.allowNoColonSimpleBlocks()}? statement
+  : comment '{' ({lineTerminatorAhead()}? comment)? statement* comments '}'
+  | {options.allowColonSimpleBlocks()}? ':' ({lineTerminatorAhead()}? comment)? {!next(SEMI)}? statement
+  | {options.allowNoColonSimpleBlocks()}? ({lineTerminatorAhead()}? comment)? statement
   ;
 
 elif
+returns [List<Token> commentTokens]
+@init {
+    $commentTokens = getPrecedingLineComments();
+}
   : 'elif' namedExpressionCond block
   ;
 
 elseBlock
+returns [List<Token> commentTokens]
+@init {
+    $commentTokens = getPrecedingLineComments();
+}
   : 'else' block
   ;
 
@@ -147,6 +162,10 @@ subjectExpr
   ;
 
 caseBlock
+returns [List<Token> commentTokens]
+@init {
+    $commentTokens = getPrecedingLineComments();
+}
   : {options.forceParensInReturnYieldRaise()}? 'case' '(' patterns? ')' guard? block
   | {!options.forceParensInReturnYieldRaise()}? 'case' patterns guard? block
   ;
@@ -230,11 +249,11 @@ retType
   ;
 
 funcBody
-  : '{' statement* '}'
+  : '{' statement* comments '}'
   ;
 
 classBody
-  : '{' statement* '}'
+  : '{' statement* comments '}'
   ;
 
 parameters
@@ -288,11 +307,18 @@ kwds
 
 
 decorators
+@init {
+    boolean temp_inDecorator = inDecorator;
+    inDecorator = true;
+}
   : decorator+
   ;
+finally {
+    inDecorator = temp_inDecorator;
+}
 
 decorator
-  : '@' namedExpression
+  : '@' namedExpression comment comments
   ;
 
 
@@ -467,14 +493,30 @@ expressions
   ;
 
 expression
-  : disjunction 'if' disjunction 'else' expression # IfExpression
-  | disjunction                                    # DisjunctionExpression
-  | lambdaHeader ':' expression                    # LambdaExpression
+  : disjunction 'if'
+    {
+        boolean temp_inDecorator = inDecorator;
+        inDecorator = false;
+    }
+    disjunction 
+    {
+        inDecorator = temp_inDecorator;
+    }
+    'else' expression           # IfExpression
+  | disjunction                 # DisjunctionExpression
+  | lambdaHeader ':' expression # LambdaExpression
   ;
 
 lambdaHeader
+@init {
+    boolean temp_inDecorator = inDecorator;
+    inDecorator = false;
+}
   : 'async'? 'lambda' (lambdaParameters | '(' lambdaParameters ')' | '(' parameters? ')')? retType?
   ;
+finally {
+    inDecorator = temp_inDecorator;
+}
 
 lambdaParameters
   : lambdaSlashNoDefault (',' lambdaParamsNoDefault)? (
@@ -614,7 +656,7 @@ termOp
   | '/'
   | '//'
   | '%'
-  | {notLineTerminator()}? '@'
+  | {!inDecorator}? '@'
   ;
 
 factor
@@ -647,8 +689,15 @@ primary
   ;
 
 slices
+@init {
+    boolean temp_inDecorator = inDecorator;
+    inDecorator = false;
+}
   : slice (',' slice)* ','?
   ;
+finally {
+    inDecorator = temp_inDecorator;
+}
 
 slice
   : begin=expression? ':' end=expression? (
@@ -658,6 +707,10 @@ slice
   ;
 
 atom
+@init {
+    boolean temp_inDecorator = inDecorator;
+    inDecorator = false;
+}
   : identifier                                                  # NamedAtom
   | 'True'                                                      # TrueAtom
   | 'False'                                                     # FalseAtom
@@ -676,6 +729,9 @@ atom
   | 'class' ('(' superClassArgs=arguments? ')')? (genExp | '(' constructorArgs=arguments? ')') classBody # AnonymousClassExpression
   | lambdaHeader funcBody                                       # MultiLineLambdaExpression
   ;
+finally {
+    inDecorator = temp_inDecorator;
+}
 
 doubleStarredKVPairs
   : doubleStarredKVPair (',' doubleStarredKVPair)* ','?
@@ -703,9 +759,16 @@ filter
   ;
 
 genExp
+@init {
+    boolean temp_inDecorator = inDecorator;
+    inDecorator = false;
+}
   : '(' assignmentExpression forIfClauses ')'
   | '(' expression forIfClauses ')'
   ;
+finally {
+    inDecorator = temp_inDecorator;
+}
 
 yieldExpression
   : 'yield' {notLineTerminator()}? 'from' 
@@ -719,9 +782,16 @@ yieldExpression
 
 
 arguments
+@init {
+    boolean temp_inDecorator = inDecorator;
+    inDecorator = false;
+}
   : argument (',' argument)* (',' kwargs)? ','?
   | kwargs ','?
   ;
+finally {
+    inDecorator = temp_inDecorator;
+}
 
 argument
   : starredExpression
@@ -794,9 +864,20 @@ identifier
   | 'case'
   ;
 
+comment
+returns [Token commentToken]
+  : {$commentToken = getFirstPrecedingComment();}
+  ;
+
+comments
+returns [List<Token> commentTokens]
+  : {$commentTokens = getPrecedingLineComments();}
+  ;
+
 eos
-  : ';'
+  : ';' comment
   | {!options.requireSemicolons()}? 
+    comment
     ( EOF
     | {lineTerminatorAhead()}?
     | {closeBrace()}?

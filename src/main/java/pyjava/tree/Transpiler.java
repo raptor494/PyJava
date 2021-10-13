@@ -1,17 +1,18 @@
 package pyjava.tree;
 
+import static pyjava.parser.PyJavaLexer.BLOCK_COMMENT;
 import static pyjava.parser.PyJavaLexer.DOT;
 import static pyjava.parser.PyJavaLexer.ELLIPSIS;
-import static pyjava.tree.GetGroupAtomContents.getGroupAtomContents;
+import static pyjava.parser.PyJavaLexer.LINE_COMMENT;
 import static pyjava.tree.GetGroupAtom.getGroupAtom;
+import static pyjava.tree.GetGroupAtomContents.getGroupAtomContents;
 import static pyjava.tree.GetPrimary.getPrimary;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.Objects;
+import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
@@ -94,15 +95,22 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
 
     @Override
     public Void visitEmptyStatement(EmptyStatementContext ctx) {
-        a.append("pass").newline();
+        handleComments(ctx.commentTokens);
+        a.append("pass");
+        var comment = ctx.comment();
+        if (comment != null) {
+            comment.accept(this);
+        }
+        a.newline();
         return null;
     }
 
     @Override
     public Void visitAssignmentStatement(AssignmentStatementContext ctx) {
         newStatement();
+        handleComments(ctx.commentTokens);
         ctx.assignment().accept(this);
-        a.newline();
+        ctx.eos().accept(this);
         endStatement();
         return null;
     }
@@ -337,8 +345,9 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitExpressionStatement(ExpressionStatementContext ctx) {
         newStatement();
+        handleComments(ctx.commentTokens);
         ctx.starExpressions().accept(this);
-        a.newline();
+        ctx.eos().accept(this);
         endStatement();
         return null;
     }
@@ -346,6 +355,7 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitReturnStatement(ReturnStatementContext ctx) {
         newStatement();
+        handleComments(ctx.commentTokens);
         a.append("return");
         // var starExpressions = ctx.starExpressions();
         // if (starExpressions != null) {
@@ -357,7 +367,7 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
             a.append(' ');
             retVal.accept(this);
         }
-        a.newline();
+        ctx.eos().accept(this);
         endStatement();
         return null;
     }
@@ -382,8 +392,9 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitYieldStatement(YieldStatementContext ctx) {
         newStatement();
+        handleComments(ctx.commentTokens);
         ctx.yieldExpression().accept(this);
-        a.newline();
+        ctx.eos().accept(this);
         endStatement();
         return null;
     }
@@ -411,12 +422,13 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitRaiseFromStatement(RaiseFromStatementContext ctx) {
         newStatement();
+        handleComments(ctx.commentTokens);
         a.append("raise ");
         var iter = ctx.expression(0) != null? ctx.expression().iterator() : ctx.namedExpressionCond().iterator();
         iter.next().accept(this);
         a.append(" from ");
         iter.next().accept(this);
-        a.newline();
+        ctx.eos().accept(this);
         endStatement();
         return null;
     }
@@ -424,22 +436,24 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitRaiseStatement(RaiseStatementContext ctx) {
         newStatement();
+        handleComments(ctx.commentTokens);
         a.append("raise");
         var retVal = ctx.retVal();
         if (retVal != null) {
             a.append(' ');
             retVal.accept(this);
         }
-        a.newline();
+        ctx.eos().accept(this);
         endStatement();
         return null;
     }
 
     @Override
     public Void visitImportStatement(ImportStatementContext ctx) {
+        handleComments(ctx.commentTokens);
         a.append("import ");
         ctx.dottedAsNames().accept(this);
-        a.newline();
+        ctx.eos().accept(this);
         return null;
     }
 
@@ -471,11 +485,12 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
 
     @Override
     public Void visitFromImportStatement(FromImportStatementContext ctx) {
+        handleComments(ctx.commentTokens);
         a.append("from ");
         ctx.importFromName().accept(this);
         a.append(" import ");
         ctx.importFromTargets().accept(this);
-        a.newline();
+        ctx.eos().accept(this);
         return null;
     }
 
@@ -543,9 +558,10 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitDelStatement(DelStatementContext ctx) {
         newStatement();
+        handleComments(ctx.commentTokens);
         a.append("del ");
         ctx.delTargets().accept(this);
-        a.newline();
+        ctx.eos().accept(this);
         endStatement();
         return null;
     }
@@ -627,8 +643,8 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitAssertStatement(AssertStatementContext ctx) {
         newStatement();
+        handleComments(ctx.commentTokens);
         a.append("assert ");
-        
         if (ctx.LPAREN() != null) {
             var iter = ctx.namedExpression().iterator();
             a.append('(');
@@ -647,50 +663,57 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
                 iter.next().accept(this);
             }
         }
-        a.newline();
+        ctx.eos().accept(this);
         endStatement();
         return null;
     }
 
     @Override
     public Void visitBreakStatement(BreakStatementContext ctx) {
-        a.append("break").newline();
+        handleComments(ctx.commentTokens);
+        a.append("break");
+        ctx.eos().accept(this);
         return null;
     }
 
     @Override
     public Void visitContinueStatement(ContinueStatementContext ctx) {
-        a.append("continue").newline();
+        handleComments(ctx.commentTokens);
+        a.append("continue");
+        ctx.eos().accept(this);
         return null;
     }
 
     @Override
     public Void visitGlobalStatement(GlobalStatementContext ctx) {
+        handleComments(ctx.commentTokens);
         a.append("global ");
         var iter = ctx.identifier().iterator();
         a.append(iter.next().getText());
         while (iter.hasNext()) {
             a.append(", ").append(iter.next().getText());
         }
-        a.newline();
+        ctx.eos().accept(this);
         return null;
     }
 
     @Override
     public Void visitNonLocalStatement(NonLocalStatementContext ctx) {
+        handleComments(ctx.commentTokens);
         a.append("nonlocal ");
         var iter = ctx.identifier().iterator();
         a.append(iter.next().getText());
         while (iter.hasNext()) {
             a.append(", ").append(iter.next().getText());
         }
-        a.newline();
+        ctx.eos().accept(this);
         return null;
     }
 
     @Override
     public Void visitFunctionDef(FunctionDefContext ctx) {
         newStatement();
+        handleComments(ctx.commentTokens);
         var decorators = ctx.decorators();
         if (decorators != null) {
             decorators.accept(this);
@@ -700,15 +723,24 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
         if (retType != null) {
             retType.accept(this);
         }
+
+        var comment = ctx.comment();
+        var comments = ctx.comments();
+
         var funcBody = ctx.funcBody();
+        var funcBodyComments = funcBody.comments();
         var statements = funcBody.statement();
         var iter = statements.iterator();
         
         var strLiteral = ctx.STRING_LITERAL();
         if (strLiteral != null) {
-            a.append(':').incrIndent().newline().append(strLiteral.getText()).newline();
+            a.append(':');
+            comment.accept(this);
+            a.incrIndent().newline();
+            comments.accept(this);
+            a.append(strLiteral.getText()).newline();
         } else {
-            if (statements.size() == 1) {
+            if (statements.size() == 1 && comment.commentToken == null && comments.commentTokens.isEmpty() && (funcBodyComments == null || funcBodyComments.commentTokens.isEmpty())) {
                 var first = statements.get(0);
                 if (first instanceof ExpressionStatementContext exprStmt) {
                     var expr = getGroupAtom(exprStmt.starExpressions());
@@ -718,18 +750,27 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
                     }
                 }
             }
-            a.append(':').incrIndent().newline();
+            a.append(':');
+            comment.accept(this);
+            a.incrIndent().newline();
+            comments.accept(this);
         }
         if (iter.hasNext()) {
             do {
                 iter.next().accept(this);
             } while (iter.hasNext());
+            if (funcBodyComments != null) {
+                funcBodyComments.accept(this);
+            }
             a.decrIndentNewline();
         } else {
             if (strLiteral == null) {
-                a.append("pass");
+                a.append("pass").newline();
             }
-            a.decrIndent().newline();
+            if (funcBodyComments != null) {
+                funcBodyComments.accept(this);
+            }
+            a.decrIndentNewline();
         }
         endStatement();
         return null;
@@ -947,21 +988,32 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitClassDef(ClassDefContext ctx) {
         newStatement();
+        handleComments(ctx.commentTokens);
         var decorators = ctx.decorators();
         if (decorators != null) {
             decorators.accept(this);
         }
         ctx.classHeader().accept(this);
-        a.append(':').incrIndent().newline();
+        a.append(':');
+        ctx.comment().accept(this);
+        a.incrIndent().newline();
+        ctx.comments().accept(this);
         var strLiteral = ctx.STRING_LITERAL();
         if (strLiteral != null) {
             a.append(strLiteral.getText());
         }
-        var iter = ctx.classBody().statement().iterator();
+        var classBody = ctx.classBody();
+        var classBodyComments = classBody.comments();
+        var iter = classBody.statement().iterator();
         if (iter.hasNext()) {
             do {
                 iter.next().accept(this);
             } while (iter.hasNext());
+            classBodyComments.accept(this);
+            a.decrIndentNewline();
+        } else if (!classBodyComments.commentTokens.isEmpty()) {
+            a.append("pass").newline();
+            classBodyComments.accept(this);
             a.decrIndentNewline();
         } else {
             a.append("pass").decrIndent().newline();
@@ -996,7 +1048,19 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     public Void visitDecorator(DecoratorContext ctx) {
         a.append('@');
         ctx.namedExpression().accept(this);
+        // var comment = ctx.comment();
+        // List<Token> comments = ctx.comments().commentTokens;
+        // if (comment.commentToken != null) {
+        //     if (!comments.isEmpty() && comments.get(0) == comment.commentToken) {
+        //         comments = comments.subList(1, comments.size());
+        //     }
+        //     a.append(' ');
+        //     comment.accept(this);
+        // }
+        ctx.comment().accept(this);
         a.newline();
+        ctx.comments().accept(this);
+        // handleComments(comments);
         return null;
     }
 
@@ -1121,6 +1185,7 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitIfStatement(IfStatementContext ctx) {
         newStatement();
+        handleComments(ctx.commentTokens);
         a.append("if ");
         getCond(ctx.namedExpressionCond()).accept(this);
         ctx.block().accept(this);
@@ -1137,6 +1202,7 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
 
     @Override
     public Void visitElif(ElifContext ctx) {
+        handleComments(ctx.commentTokens);
         a.append("elif ");
         getCond(ctx.namedExpressionCond()).accept(this);
         ctx.block().accept(this);
@@ -1145,6 +1211,7 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
 
     @Override
     public Void visitElseBlock(ElseBlockContext ctx) {
+        handleComments(ctx.commentTokens);
         a.append("else");
         ctx.block().accept(this);
         return null;
@@ -1153,8 +1220,9 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitFuncBody(FuncBodyContext ctx) {
         var statements = ctx.statement();
+        var comments = ctx.comments();
         var iter = statements.iterator();
-        if (statements.size() == 1) {
+        if (statements.size() == 1 && comments.commentTokens.isEmpty()) {
             var first = statements.get(0);
             if (first instanceof ExpressionStatementContext exprStmt) {
                 var expr = getGroupAtom(exprStmt.starExpressions());
@@ -1170,6 +1238,12 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
             do {
                 iter.next().accept(this);
             } while (iter.hasNext());
+            comments.accept(this);
+            a.decrIndentNewline();
+        } else if (!comments.commentTokens.isEmpty()) {
+            a.incrIndent().newline()
+             .append("pass").newline();
+            comments.accept(this);
             a.decrIndentNewline();
         } else {
             a.append(" pass").newline();
@@ -1179,6 +1253,7 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
 
     @Override
     public Void visitClassBody(ClassBodyContext ctx) {
+        var comments = ctx.comments();
         var iter = ctx.statement().iterator();
         a.append(':');
         if (iter.hasNext()) {
@@ -1186,6 +1261,12 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
             do {
                 iter.next().accept(this);
             } while (iter.hasNext());
+            comments.accept(this);
+            a.decrIndentNewline();
+        } else if (!comments.commentTokens.isEmpty()) {
+            a.incrIndent().newline()
+             .append("pass").newline();
+            comments.accept(this);
             a.decrIndentNewline();
         } else {
             a.append(" pass").newline();
@@ -1195,14 +1276,32 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
 
     @Override
     public Void visitBlock(BlockContext ctx) {
+        var comments = ctx.comments();
         var iter = ctx.statement().iterator();
         a.append(':');
+        boolean hasComment = false;
+        for (var comment : ctx.comment()) {
+            comment.accept(this);
+            if (comment.commentToken != null) {
+                hasComment = true;
+            }
+        }
         if (iter.hasNext()) {
             a.incrIndent().newline();
             do {
                 iter.next().accept(this);
             } while (iter.hasNext());
+            if (comments != null) {
+                comments.accept(this);
+            }
             a.decrIndentNewline();
+        } else if (comments != null && !comments.commentTokens.isEmpty()) {
+            a.incrIndent().newline();
+            a.append("pass").newline();
+            comments.accept(this);
+            a.decrIndentNewline();
+        } else if (hasComment) {
+            a.incrIndent().newline().append("pass").decrIndent().newline();
         } else {
             a.append(" pass").newline();
         }
@@ -1345,9 +1444,14 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitMatchStatement(MatchStatementContext ctx) {
         newStatement();
+        handleComments(ctx.commentTokens);
         a.append("match ");
         ctx.subjectExprCond().accept(this);
-        a.append(':').incrIndent().newline();
+        a.append(':');
+        for (var comment : ctx.comment()) {
+            comment.accept(this);
+        }
+        a.incrIndent().newline();
         for (var caseBlock : ctx.caseBlock()) {
             caseBlock.accept(this);
         }
@@ -1387,6 +1491,7 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
 
     @Override
     public Void visitCaseBlock(CaseBlockContext ctx) {
+        handleComments(ctx.commentTokens);
         a.append("case ");
         var patterns = ctx.patterns();
         if (patterns != null) {
@@ -2433,6 +2538,7 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
         for (var statement : ctx.statement()) {
             statement.accept(this);
         }
+        ctx.comments().accept(this);
         return null;
     }
 
@@ -2631,5 +2737,97 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     @Override
     public Void visitGenExpAtom(GenExpAtomContext ctx) {
         return ctx.genExp().accept(this);
+    }
+
+    private static final Pattern BLOCK_COMMENT_SINGLE_LINE = Pattern.compile("^#\\{(?:[^#\r\n]|#[^}\r\n])*#}$");
+    private static final Pattern BLOCK_COMMENT_BEGIN_EMPTY = Pattern.compile("^#\\{[\s\t]*$");
+    private static final Pattern BLOCK_COMMENT_END_EMPTY   = Pattern.compile("^[\s\t]*#}$");
+    private static final Pattern LEADING_HASH = Pattern.compile("\\A[\s\t]*#");
+
+    protected void handleComments(List<Token> commentTokens) {
+        for (var commentToken : commentTokens) {
+            for (var line : getCommentText(commentToken)) {
+                a.append("# "+line).newline();
+            }
+        }
+    }
+
+    @Override
+    public Void visitEos(EosContext ctx) {
+        var comment = ctx.comment();
+        if (comment != null) {
+            comment.accept(this);
+        }
+        a.newline();
+        return null;
+    }
+
+    @Override
+    public Void visitComments(CommentsContext ctx) {
+        handleComments(ctx.commentTokens);
+        return null;
+    }
+
+    @Override
+    public Void visitComment(CommentContext ctx) {
+        if (ctx.commentToken != null) {
+            a.append(" # "+String.join(" ", getCommentText(ctx.commentToken)));
+        }
+        return null;
+    }
+
+    protected String[] getCommentText(Token commentToken) {
+        switch (commentToken.getType()) {
+            case BLOCK_COMMENT -> {
+                String text = commentToken.getText();
+                if (BLOCK_COMMENT_SINGLE_LINE.matcher(text).matches()) {
+                    return new String[] {text.substring(2, text.length() - 2).strip()};
+                }
+                String[] lines = text.split("\\R");
+                assert lines[0].startsWith("#{");
+                assert lines[lines.length-1].endsWith("#}");
+                boolean hasEmptyFirstLine = BLOCK_COMMENT_BEGIN_EMPTY.matcher(lines[0]).matches();
+                boolean hasEmptyLastLine  = BLOCK_COMMENT_END_EMPTY.matcher(lines[lines.length-1]).matches();
+                if (!hasEmptyLastLine) {
+                    String line = lines[lines.length-1];
+                    assert line.endsWith("#}");
+                    lines[lines.length-1] = line.substring(0, line.length() - 2).stripTrailing();
+                }
+                int end = lines.length - (hasEmptyLastLine? 1 : 0);
+                var resultLinesList = new ArrayList<String>(lines.length - (hasEmptyLastLine? 1 : 0));
+                if (1 < end) {
+                    resultLinesList.add(lines[1]);
+                    var hashMatcher = LEADING_HASH.matcher(lines[1]);
+                    String leadingHash = hashMatcher.find()? hashMatcher.group() : null;
+                    for (int i = 2; i < end; i++) {
+                        String line = lines[i];
+                        resultLinesList.add(line);
+                        if (leadingHash != null && hashMatcher.reset(line).find()) {
+                            if (!leadingHash.equals(hashMatcher.group())) {
+                                leadingHash = null;   
+                            }
+                        }
+                    }
+                    if (leadingHash != null) {
+                        for (int i = 0; i < resultLinesList.size(); i++) {
+                            resultLinesList.set(i, resultLinesList.get(i).substring(leadingHash.length()));
+                        }
+                    }
+                    String[] tempLines = String.join("\n", resultLinesList).stripIndent().split("\n");
+                    assert tempLines.length == resultLinesList.size();
+                    for (int i = 0; i < resultLinesList.size(); i++) {
+                        resultLinesList.set(i, tempLines[i]);
+                    }
+                }
+                if (!hasEmptyFirstLine) {
+                    resultLinesList.add(0, lines[0].substring(2).stripLeading());
+                }
+                return resultLinesList.toArray(String[]::new);
+            }
+            case LINE_COMMENT -> {
+                return new String[] {commentToken.getText().substring(1).stripLeading()};
+            }
+            default -> throw new IllegalArgumentException();
+        }
     }
 }

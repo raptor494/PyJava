@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.json.simple.parser.JSONParser;
@@ -259,18 +260,26 @@ public class PyJava {
         }
     }
 
-    private static void processFile(Path file, Path output, PyJavaOptions options) {
-        var transpiler = new Transpiler();
+    private static void processFile(Path input, Path output, PyJavaOptions options) {
+        PyJavaParser.FileContext file;
         try {
-            var source = CharStreams.fromPath(file);
+            var source = CharStreams.fromPath(input);
             var lexer = new PyJavaLexer(source);
             var tokens = new CommonTokenStream(lexer);
             var parser = new PyJavaParser(tokens, options);
-            var result = parser.file();
-            result.accept(transpiler);
+            parser.setErrorHandler(new BailErrorStrategy());
+            file = parser.file();
         } catch (Exception e) {
-            System.err.println("Failed to process file "+file+':');
+            System.err.println("Failed to process file "+input+':');
             e.printStackTrace(System.err);
+            return;
+        }
+        var transpiler = new Transpiler();
+        try {
+            file.accept(transpiler);
+        } catch (Exception e) {
+            System.err.println("Failed to transpile file "+input+':');
+            e.printStackTrace(System.out);
             return;
         }
         try {
