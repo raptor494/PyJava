@@ -27,8 +27,11 @@ statement
   | starExpressions eos                                             # ExpressionStatement
   | 'return' retVal? eos          # ReturnStatement
   | yieldExpression eos                                                   # YieldStatement
-  | 'raise' {notLineTerminator()}? expression {notLineTerminator()}? 'from' expression eos # RaiseFromStatement
-  | 'raise' ({notLineTerminator()}? expression)? eos                # RaiseStatement
+  | {!options.forceParensInReturnYieldRaise()}?
+    'raise' {notLineTerminator()}? expression {notLineTerminator()}? 'from' expression eos # RaiseFromStatement
+  | {options.forceParensInReturnYieldRaise()}?
+    'raise' {notLineTerminator()}? namedExpressionCond {notLineTerminator()}? 'from' namedExpressionCond eos # RaiseFromStatement
+  | 'raise' retVal? eos                # RaiseStatement
   | 'import' dottedAsNames eos                                      # ImportStatement
   | 'from' importFromName 'import' importFromTargets eos            # FromImportStatement
   | 'pass' eos                                                      # EmptyStatement
@@ -190,8 +193,8 @@ dottedName
 
 
 delTargets
-  : '(' (delTarget (',' delTarget)* ','?)? ')'
-  | {!options.forceParensInReturnYieldRaise()}? delTarget (',' delTarget)*
+  : {!options.forceParensInReturnYieldRaise()}? delTarget (',' delTarget)*
+  | '(' (delTarget (',' delTarget)* ','?)? ')'
   ;
 
 delTarget

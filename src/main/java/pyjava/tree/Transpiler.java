@@ -412,9 +412,10 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     public Void visitRaiseFromStatement(RaiseFromStatementContext ctx) {
         newStatement();
         a.append("raise ");
-        ctx.expression(0).accept(this);
+        var iter = ctx.expression(0) != null? ctx.expression().iterator() : ctx.namedExpressionCond().iterator();
+        iter.next().accept(this);
         a.append(" from ");
-        ctx.expression(1).accept(this);
+        iter.next().accept(this);
         a.newline();
         endStatement();
         return null;
@@ -424,10 +425,10 @@ public class Transpiler extends PyJavaParserBaseVisitor<Void> {
     public Void visitRaiseStatement(RaiseStatementContext ctx) {
         newStatement();
         a.append("raise");
-        var expression = ctx.expression();
-        if (expression != null) {
+        var retVal = ctx.retVal();
+        if (retVal != null) {
             a.append(' ');
-            expression.accept(this);
+            retVal.accept(this);
         }
         a.newline();
         endStatement();
