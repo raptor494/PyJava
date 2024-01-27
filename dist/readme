@@ -1,0 +1,5 @@
+1. Put corresponding to your os file pyj into needed directory
+2. Add path/to/pyjava.jar, path/to/java.exe, path/to/python.exe into $PATH env var
+3. Make pyj cmdlet (e.g. using chmod +x)
+4. Use it like pyj script.pyj <args>
+5. It will automatically compile it with PyJava and run with Python

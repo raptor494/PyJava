@@ -1,0 +1,4 @@
+PYJAVA_PATH=$(whereis -b pyjava.jar | cut -d' ' -f2)
+PYJAVA_PATH=$(echo "$PYJAVA_PATH" | sed -E 's|/mnt/([a-z])/|\1:/|')
+java.exe -jar "$PYJAVA_PATH" "$@" &&
+python.exe "${1%.pyj}.py"

@@ -1,0 +1,3 @@
+PYJAVA_PATH=$(command -v pyjava.jar | cut -d' ' -f2)
+java -jar "$PYJAVA_PATH" "$@" &&
+python "${1%.pyj}.py"
