@@ -1,0 +1,6 @@
+@echo off
+for /f "tokens=2" %%a in ('where /R %~dp0 pyjava.jar') do set PYJAVA_PATH=%%a
+java.exe -jar "%PYJAVA_PATH%" %* && (
+    set PY_SCRIPT=%1
+    python.exe "%PY_SCRIPT:.pyj=.py%"
+)
